@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
+
+	"github.com/mitchellh/mapstructure"
 )
 
 var (
@@ -364,4 +367,30 @@ func (o *Option[T]) UnmarshalJSON(data []byte) error {
 	*o = Some(v)
 
 	return nil
+}
+
+func (o *Option[T]) UnmarshalTOML(data any) error {
+	rv := reflect.ValueOf(data)
+	tt := reflect.TypeOf((*T)(nil)).Elem()
+	fmt.Println(reflect.TypeOf(o).Elem())
+
+	// XXX: this will also return true for float->int :(
+	if rv.CanConvert(tt) {
+		val := rv.Convert(tt).Interface()
+		if v, ok := val.(T); ok {
+			*o = Some(v)
+			return nil
+		}
+	}
+
+	var vv T
+	if tt.Kind() == reflect.Struct {
+		err := mapstructure.Decode(data, &vv)
+		if err != nil {
+			*o = Some(vv)
+			return nil
+		}
+	}
+
+	return fmt.Errorf("cannot unmarshal %T to %T", data, vv)
 }

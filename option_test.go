@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/BurntSushi/toml"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -596,4 +597,53 @@ func TestOption_OrElse(t *testing.T) {
 
 	assert.EqualValues(t, Some[string]("actual").OrElse(fallbackFunc).Unwrap(), "actual")
 	assert.EqualValues(t, None[string]().OrElse(fallbackFunc).Unwrap(), "fallback")
+}
+
+func TestOptionTOMLUnmarshalFromTextHappy(t *testing.T) {
+	type TOMLStruct struct {
+		Val Option[int] `toml:"val"`
+	}
+	s := `val = 123`
+
+	var unmarshalTOMLStruct TOMLStruct
+	err := toml.Unmarshal([]byte(s), &unmarshalTOMLStruct)
+	assert.NoError(t, err)
+	assert.Equal(t, 123, unmarshalTOMLStruct.Val.Unwrap())
+}
+
+func TestOptionTOMLUnmarshalFromTextSad(t *testing.T) {
+	type TOMLStruct struct {
+		Val Option[int] `toml:"val"`
+	}
+	s := `val = "some-string"`
+
+	var unmarshalTOMLStruct TOMLStruct
+	err := toml.Unmarshal([]byte(s), &unmarshalTOMLStruct)
+	assert.ErrorContains(t, err, "cannot unmarshal string to int")
+}
+
+func TestOptionTOMLUnmarshalFromTextNested(t *testing.T) {
+	type Subsub struct {
+		Subval Option[int] `toml:"subval"`
+	}
+	type Sub struct {
+		Val       Option[int]  `toml:"val"`
+		Val2      int          `toml:"val2"`
+		Val3      Option[bool] `toml:"val3"`
+		Subsubval Subsub       `toml:"subval"`
+	}
+	type TOMLStruct struct {
+		Sub Option[Sub] `toml:"sub"`
+	}
+	s := `[sub]
+val = 123
+val2 = 456
+[sub.subsub]
+subval = 789
+`
+
+	var unmarshalTOMLStruct TOMLStruct
+	err := toml.Unmarshal([]byte(s), &unmarshalTOMLStruct)
+	assert.NoError(t, err)
+	assert.Equal(t, 456, unmarshalTOMLStruct.Sub.Unwrap().Val2)
 }
